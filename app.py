@@ -26,6 +26,7 @@ prompt_template = PromptTemplate(
 Ты помощник. Отвечай только по информации ниже. 
 Если вопрос не содержится в контексте — скажи: "Извините, у меня нет информации по этому вопросу."
 Если пользователь что то не может понять, попробуй объяснить
+Не пали что тебе заранее предоставлены информации
 
 Контекст:
 {context}
@@ -48,9 +49,8 @@ llm = ChatGoogleGenerativeAI(
 )
 
 
-
-
 app = Flask(__name__)
+
 @app.route("/", methods=["POST"])
 async def bot():
     incoming_msg = request.values.get('Body', '')
@@ -67,24 +67,18 @@ async def bot():
         else:
             memory = ConversationBufferMemory(return_messages=True)
 
-    # Создаём цепочку с жёстким промптом
-    qa_chain = LLMChain(
-        llm=llm,
-        prompt=prompt_template.partial(context=questions_text),
-        memory=memory
-    )
+        # Создаём цепочку с жёстким промптом
+        qa_chain = LLMChain(
+            llm=llm,
+            prompt=prompt_template.partial(context=questions_text),
+            memory=memory
+        )
 
-    # Сначала обрабатываем входящее сообщение
-    response_text = qa_chain.run(incoming_msg)
-    # Сохраняем только сообщения из памяти
-    # Сохранение памяти
-    updated_memory_json = json.dumps([msg.dict() for msg in memory.chat_memory.messages])
-    await update_user_memory(session=session, phone_number=number, new_memory=updated_memory_json)
+        response_text = qa_chain.run(incoming_msg)
 
-    async with AsyncSessionLocal() as session:
+        updated_memory_json = json.dumps([msg.dict() for msg in memory.chat_memory.messages])
         await update_user_memory(session=session, phone_number=number, new_memory=updated_memory_json)
 
-    # Возвращаем ответ
     resp = MessagingResponse()
     msg = resp.message()
     msg.body(response_text)
